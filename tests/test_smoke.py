@@ -324,15 +324,17 @@ def test_api_turn_mock(tmp_path, monkeypatch):
 
 
 def test_energy_vad():
-    import numpy as np
+    import math
+    import random
 
     from narthex.audio.backends import EnergyVad
 
     vad = EnergyVad(threshold=0.01)
-    silence = np.zeros(1280, dtype=np.float32)
-    speech = np.random.randn(1280).astype(np.float32) * 0.2
+    silence = [0.0] * 1280
+    speech = [random.uniform(-0.3, 0.3) for _ in range(1280)]
     assert vad.is_speech(silence) is False
     assert vad.is_speech(speech) is True
+    assert math.sqrt(sum(x * x for x in speech) / len(speech)) > 0.01
 
 
 def test_live_runner_status_without_mic(tmp_path):

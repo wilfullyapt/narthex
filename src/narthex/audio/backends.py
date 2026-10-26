@@ -80,7 +80,7 @@ def try_openwakeword(
 
 
 class EnergyVad:
-    """Simple RMS energy VAD — no torch. Good fallback and tests."""
+    """Simple RMS energy VAD — stdlib only (no numpy/torch)."""
 
     name = "energy"
 
@@ -88,12 +88,24 @@ class EnergyVad:
         self.threshold = threshold
 
     def is_speech(self, pcm_float32: Any) -> bool:
-        import numpy as np
-
-        audio = np.asarray(pcm_float32, dtype=np.float32).reshape(-1)
-        if audio.size == 0:
+        try:
+            seq = list(pcm_float32)
+        except TypeError:
             return False
-        rms = float(np.sqrt(np.mean(np.square(audio)) + 1e-12))
+        if not seq:
+            return False
+        # flatten one level if nested
+        if seq and hasattr(seq[0], "__iter__") and not isinstance(seq[0], (str, bytes)):
+            flat = []
+            for x in seq:
+                flat.extend(list(x))
+            seq = flat
+        n = len(seq)
+        acc = 0.0
+        for x in seq:
+            v = float(x)
+            acc += v * v
+        rms = (acc / n + 1e-12) ** 0.5
         return rms >= self.threshold
 
     def reset(self) -> None:
