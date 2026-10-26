@@ -19,6 +19,11 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--dry-run", action="store_true", help="Load config + home scene and exit")
     parser.add_argument("--ui-only", action="store_true", help="Bind UI host/port only")
     parser.add_argument("--api-only", action="store_true", help="Bind device API host/port only")
+    parser.add_argument(
+        "--live-audio",
+        action="store_true",
+        help="Start LiveMicRunner (OWW+VAD+whisper) in background",
+    )
     args = parser.parse_args(argv)
 
     store = load_config(args.config)
@@ -29,14 +34,32 @@ def main(argv: list[str] | None = None) -> None:
     tts = build_tts(store.cfg.audio.tts.engine, store.cfg.audio.tts.voice)
     runtime.doorway = Doorway(runtime, tts=tts)  # type: ignore[attr-defined]
 
+    live = None
+    want_live = args.live_audio or bool(getattr(store.cfg.audio, "live", False))
+    if want_live:
+        from narthex.runner import LiveMicRunner
+
+        live = LiveMicRunner(
+            runtime.doorway,
+            device_index=getattr(store.cfg.audio, "device_index", None),
+            speak=store.cfg.audio.tts.engine not in (None, "null", "none", "off", ""),
+        )
+        runtime.live_mic = live  # type: ignore[attr-defined]
+        live.start()
+
     if args.dry_run:
+        notes = ""
+        if live is not None:
+            notes = f" live_notes={live.stack_notes}"
+            live.stop()
         print(
             f"narthexd dry-run ok versioned scene={runtime.scene.id} "
             f"widgets={len(runtime.scene.widgets)} "
             f"wake={store.cfg.wake.phrase!r} "
             f"cold_listen={store.cfg.wake.cold_listen_when_asleep} "
             f"audio={runtime.audio_state} "
-            f"tts={store.cfg.audio.tts.engine}"
+            f"tts={store.cfg.audio.tts.engine} "
+            f"live={want_live}{notes}"
         )
         return
 

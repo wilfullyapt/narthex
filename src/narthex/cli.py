@@ -66,6 +66,38 @@ def cmd_wake(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_listen(args: argparse.Namespace) -> int:
+    """Live mic: openWakeWord → VAD → faster-whisper → Portunus. Ctrl-C to stop."""
+    import time
+
+    from narthex.runner import LiveMicRunner
+
+    store = load_config(args.config)
+    rt = Runtime(store)
+    hermes = HermesClient(store.cfg.hermes, session_id=store.cfg.node.id)
+    if args.mock_hermes:
+        hermes = _MockHermes()
+    tts = build_tts(store.cfg.audio.tts.engine if args.speak else "null", store.cfg.audio.tts.voice)
+    doorway = Doorway(rt, hermes=hermes, tts=tts)
+    live = LiveMicRunner(
+        doorway,
+        device_index=args.device_index if args.device_index is not None else store.cfg.audio.device_index,
+        speak=bool(args.speak),
+    )
+    print(json.dumps({"starting": True, **live.status()}, indent=2))
+    live.start()
+    try:
+        while True:
+            time.sleep(1)
+            if live.last_error:
+                print(json.dumps({"error": live.last_error, **live.status()}, indent=2))
+                return 1
+    except KeyboardInterrupt:
+        live.stop()
+        print(json.dumps({"stopped": True, **live.status()}, indent=2))
+        return 0
+
+
 class _MockHermes:
     def chat(self, user_text: str, *, system: str | None = None) -> dict:
         return {
@@ -190,6 +222,12 @@ def main(argv: list[str] | None = None) -> None:
 
     p_wake = sub.add_parser("wake", help="Simulate wake chrome only")
     p_wake.set_defaults(func=cmd_wake)
+
+    p_listen = sub.add_parser("listen", help="Start live mic loop (OWW+VAD+whisper) until Ctrl-C")
+    p_listen.add_argument("--device-index", type=int, default=None)
+    p_listen.add_argument("--speak", action="store_true")
+    p_listen.add_argument("--mock-hermes", action="store_true")
+    p_listen.set_defaults(func=cmd_listen)
 
     p_ota = sub.add_parser("ota", help="OTA operations")
     ota_sub = p_ota.add_subparsers(dest="ota_cmd", required=True)

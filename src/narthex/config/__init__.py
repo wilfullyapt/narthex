@@ -34,6 +34,8 @@ class WakeConfig(BaseModel):
     phrase: str = "hey hermes"
     engine: str = "openwakeword"
     cold_listen_when_asleep: bool = True
+    model_path: str | None = None  # optional custom OWW tflite for hey_hermes
+    threshold: float = 0.5
 
 
 class SttConfig(BaseModel):
@@ -50,6 +52,10 @@ class TtsConfig(BaseModel):
 class AudioConfig(BaseModel):
     stt: SttConfig = Field(default_factory=SttConfig)
     tts: TtsConfig = Field(default_factory=TtsConfig)
+    silence_end_s: float = 1.2
+    listen_timeout_s: float = 12.0
+    live: bool = False
+    device_index: int | None = None
 
 
 class DisplayConfig(BaseModel):

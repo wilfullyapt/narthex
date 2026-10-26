@@ -29,16 +29,22 @@ hermes:
 
 wake:
   phrase: hey hermes
-  engine: openwakeword  # scaffold — wire on device
+  engine: openwakeword
   cold_listen_when_asleep: true
+  model_path: null  # custom hey_hermes.tflite when available
+  threshold: 0.5
 
 audio:
+  live: false
+  device_index: null
+  silence_end_s: 1.2
+  listen_timeout_s: 12
   stt:
     engine: faster-whisper
     model_size: base
     device: cpu
   tts:
-    engine: "null"  # "null" | piper — use null until speakers wired
+    engine: "null"  # "null" | piper
     voice: en_US-lessac-medium
 
 display:

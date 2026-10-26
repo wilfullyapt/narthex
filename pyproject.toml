@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "narthex"
-version = "0.3.0"
+version = "0.4.0"
 description = "LAN voice doorway appliance: Magic Mirror–class glass + wake word to Hermes (Portunus)"
 readme = "README.md"
 license = "MIT"
@@ -39,7 +39,10 @@ audio = [
   "numpy>=1.26",
   "openwakeword>=0.6.0",
   "faster-whisper>=1.0.0",
-  # piper TTS installed separately on device
+  "sounddevice>=0.4.6",
+  "torch>=2.0",  # silero vad via torch.hub
+  # optional: pyaudio if sounddevice unavailable on the host
+  # piper TTS: install separately (binary) — see docs/tts.md
 ]
 identity = [
   # voxmetrica path when wired

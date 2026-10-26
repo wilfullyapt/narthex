@@ -13,7 +13,7 @@ from narthex.scenes import home_scene
 
 
 def test_version():
-    assert __version__ == "0.3.0"
+    assert __version__ == "0.4.0"
 
 
 def test_home_scene_has_gold_node():
@@ -76,7 +76,7 @@ def test_api_status():
     r = client.get("/device/v1/status", headers={"Authorization": "Bearer test-token"})
     assert r.status_code == 200
     body = r.json()
-    assert body["version"] == "0.3.0"
+    assert body["version"] == "0.4.0"
     assert body["scene_id"] == "home"
     assert "ota" in body
 
@@ -321,3 +321,35 @@ def test_api_turn_mock(tmp_path, monkeypatch):
     body = r.json()
     assert body["ok"] is True
     assert body["assistant_text"] == "pong-turn"
+
+
+def test_energy_vad():
+    import numpy as np
+
+    from narthex.audio.backends import EnergyVad
+
+    vad = EnergyVad(threshold=0.01)
+    silence = np.zeros(1280, dtype=np.float32)
+    speech = np.random.randn(1280).astype(np.float32) * 0.2
+    assert vad.is_speech(silence) is False
+    assert vad.is_speech(speech) is True
+
+
+def test_live_runner_status_without_mic(tmp_path):
+    from narthex.doorway import Doorway
+    from narthex.runner import LiveMicRunner
+    from narthex.tts import NullTts
+
+    class MockHermes:
+        def chat(self, user_text, *, system=None):
+            return {"choices": [{"message": {"content": "ok"}}]}
+
+    store = ConfigStore(raw={"data_dir": str(tmp_path)})
+    rt = Runtime(store)
+    door = Doorway(rt, hermes=MockHermes(), tts=NullTts())
+    live = LiveMicRunner(door, speak=False)
+    st = live.status()
+    assert st["mode"] in ("live", "injected")
+    # inject still works without opening mic
+    r = live.inject_utterance("hi", speak=False)
+    assert r["ok"] is True

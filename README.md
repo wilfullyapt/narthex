@@ -19,6 +19,8 @@
 - [docs/scenes.md](./docs/scenes.md) — widget + scene model
 - [docs/ota.md](./docs/ota.md) — signed OTA
 - [docs/audio.md](./docs/audio.md) — wake/STT design (AMI lessons)
+- [docs/tts.md](./docs/tts.md) — local TTS (Piper recommended)
+- [docs/audio-live.md](./docs/audio-live.md) — live OWW+VAD+whisper
 - [docs/hub-client.md](./docs/hub-client.md) — Portunus → device HTTP helper
 - [docs/phase-1.md](./docs/phase-1.md) — vertical slice status
 
