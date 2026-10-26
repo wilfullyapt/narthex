@@ -1,0 +1,20 @@
+# Placeholder units — install paths finalized on first Pi image.
+# narthex.service will run narthexd; kiosk session launches Chromium to UI.
+
+[Unit]
+Description=Narthex doorway daemon
+After=network-online.target sound.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=narthex
+WorkingDirectory=/opt/narthex
+ExecStart=/opt/narthex/.venv/bin/narthexd --config /etc/narthex/config.yaml
+Restart=on-failure
+RestartSec=3
+Environment=NARTHEX_DEVICE_TOKEN=change-me
+Environment=NARTHEX_HERMES_API_KEY=change-me
+
+[Install]
+WantedBy=multi-user.target

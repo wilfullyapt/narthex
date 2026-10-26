@@ -1,0 +1,79 @@
+# Narthex example config — copy to config.yaml or $NARTHEX_CONFIG (never commit secrets)
+
+version: 1
+node:
+  id: narthex-room-1
+  display_name: Family Mirror
+
+# Local data root (gallery cache, OTA versions, runtime state)
+data_dir: data
+
+server:
+  # UI + local WS (kiosk only)
+  ui_host: 127.0.0.1
+  ui_port: 7840
+  # Device API for Portunus tools (LAN). Bind carefully; firewall to hub only.
+  api_host: 0.0.0.0
+  api_port: 7841
+  # Set via env NARTHEX_DEVICE_TOKEN — never commit real tokens
+  # device_token: "use-env"
+
+hermes:
+  # Portunus API server (hub)
+  base_url: http://127.0.0.1:8642/v1
+  # model name as expected by Hermes API server
+  model: hermes-agent
+  # API key via env NARTHEX_HERMES_API_KEY
+  session_header: X-Hermes-Session-Id
+  timeout_s: 120
+
+wake:
+  phrase: hey hermes
+  engine: openwakeword  # scaffold — wire on device
+  cold_listen_when_asleep: true
+
+audio:
+  stt:
+    engine: faster-whisper
+    model_size: base
+    device: cpu
+  tts:
+    engine: piper
+    voice: en_US-lessac-medium
+
+display:
+  backend: dpms  # dpms | cec | noop
+  idle_sleep_s: 1800
+  force_on_wake: true
+
+scene:
+  default: home
+  stage:
+    # Normalized stage; renderer scales to panel pixels
+    width: 1000
+    height: 1000
+
+style:
+  void: "#000000"
+  text: "#F2EDE4"
+  gold: "#C9A227"
+  gold_dim: "#8A7019"
+  mist: "#A8A29A"
+
+identity:
+  # Optional local VoxMetrica client; hub remains authoritative for caps
+  enabled: false
+  voxmetrica_root: null
+
+ota:
+  enabled: true
+  require_signature: true
+  channel: stable
+  # check_url filled when release channel exists
+  check_url: null
+  keep_versions: 2
+
+# Pin keys tools cannot clear without ops override (enforced in config layer)
+protected_keys:
+  - ota.require_signature
+  - server.device_token
