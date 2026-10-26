@@ -69,9 +69,11 @@ ota:
   enabled: true
   require_signature: true
   channel: stable
-  # check_url filled when release channel exists
+  # HTTPS or local path to manifest JSON
   check_url: null
   keep_versions: 2
+  # public key file default: $data_dir/ota/ota_public.key
+  # or env NARTHEX_OTA_PUBLIC_KEY
 
 # Pin keys tools cannot clear without ops override (enforced in config layer)
 protected_keys:

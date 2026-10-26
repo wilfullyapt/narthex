@@ -17,7 +17,9 @@
 - [DESIGN.md](./DESIGN.md) — architecture, scenes, device API, OTA, phases
 - [docs/device-api.md](./docs/device-api.md) — Portunus-facing HTTP surface
 - [docs/scenes.md](./docs/scenes.md) — widget + scene model
-- [docs/phase-1.md](./docs/phase-1.md) — next vertical slice
+- [docs/ota.md](./docs/ota.md) — signed OTA
+- [docs/audio.md](./docs/audio.md) — wake/STT design (AMI lessons)
+- [docs/phase-1.md](./docs/phase-1.md) — vertical slice status
 
 ## Quick start (dev smoke)
 
@@ -28,9 +30,12 @@ pip install -e ".[dev]"
 pytest
 narthex version
 narthexd --config config.example.yaml --dry-run
+
+# OTA keygen + local pack/apply demo
+narthex ota keygen --out-dir /tmp/narthex-keys
 ```
 
-Kiosk + real audio require a Pi (or Linux box with mic) — see DESIGN phases.
+Kiosk + real audio require a Pi (or Linux box with mic) — see DESIGN / docs/audio.md.
 
 ## License
 

@@ -82,40 +82,23 @@ Portunus holds tools that HTTP-call the node (`NARTHEX_DEVICE_TOKEN`). Narthex d
 
 ## OTA
 
-1. `GET` channel manifest  
-2. Verify signature (`ota.require_signature`)  
-3. Stage under `versions/<ver>/`  
-4. Atomic switch + restart  
-5. Healthgate → keep or rollback to N-1  
+See [docs/ota.md](./docs/ota.md). Signed Ed25519 channel; CLI `narthex ota pack|check|apply|rollback`.
 
-Tools: `ota_check`, `ota_apply` (async job + status).
+## Audio
 
-## Package layout
-
-```
-src/narthex/
-  cli.py daemon.py bus.py
-  config/ audio/ display/ hermes/ identity/
-  api/ scenes/ widgets/ ota/
-web/                 # kiosk stage (static + later Svelte)
-pack/kiosk/          # labwc / chromium / systemd units
-config.example.yaml
-tests/
-```
+See [docs/audio.md](./docs/audio.md). AMI vad_quest listener lessons applied; local STT continuous loop.
 
 ## Phases
 
 | Phase | Outcome |
 |-------|---------|
-| **0** | This skeleton + CI smoke + public repo |
-| **1** | Headless: config + hermes client ping + dry-run daemon |
-| **2** | Device API: status, config_get/patch, scene_set stubs |
-| **3** | Web stage: home scene + gold_node + WS |
-| **4** | Audio: wake → STT → portunus → TTS |
-| **5** | Display power + cold listen |
-| **6** | OTA pipeline against signed release |
-| **7** | VoxMetrica wire-up |
-| **8** | Dialectic scene packs (data + portunus skill) |
+| **0** | Skeleton + CI + public repo |
+| **1 / 0.2** | Dual bind, WS, **working signed OTA**, audio state machine |
+| **2** | Device mic: OWW + VAD + faster-whisper + Piper |
+| **3** | DPMS/CEC + cold-listen policy on glass |
+| **4** | Portunus tools + production channel |
+| **5** | VoxMetrica |
+| **6** | Dialectic scene packs |
 
 ## Non-goals
 

@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "narthex"
-version = "0.1.0"
+version = "0.2.0"
 description = "LAN voice doorway appliance: Magic Mirror–class glass + wake word to Hermes (Portunus)"
 readme = "README.md"
 license = "MIT"
@@ -25,6 +25,7 @@ dependencies = [
   "pydantic-settings>=2.0",
   "pyyaml>=6.0",
   "websockets>=13.0",
+  "cryptography>=42.0.0",
 ]
 
 [project.optional-dependencies]
@@ -35,7 +36,10 @@ dev = [
 ]
 # Heavy edge deps installed on device as needed — not required for unit smoke.
 audio = [
-  # openwakeword, faster-whisper, piper — pinned in docs/device-deps.md later
+  "numpy>=1.26",
+  "openwakeword>=0.6.0",
+  "faster-whisper>=1.0.0",
+  # piper TTS installed separately on device
 ]
 identity = [
   # voxmetrica path when wired

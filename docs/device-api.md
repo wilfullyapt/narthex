@@ -21,8 +21,9 @@ All successful bodies are JSON. Errors: `{ "ok": false, "error": "..." }` with s
 | DELETE | `/v1/widgets/{id}` | remove widget |
 | POST | `/v1/display` | `{ "state": "on"\|"off"\|"dim", "level"?: 0-100 }` |
 | POST | `/v1/ota/check` | check channel for update |
-| POST | `/v1/ota/apply` | `{ "version": "..." }` start apply job |
+| POST | `/v1/ota/apply` | `{ "version": "...", "restart"?: false }` |
 | GET | `/v1/ota/status` | job state |
+| POST | `/v1/ota/rollback` | previous version symlink |
 | POST | `/v1/notify` | glass toast `{ "text", "ttl_s"? }` |
 | POST | `/v1/speak` | optional local TTS `{ "text" }` |
 
@@ -33,7 +34,7 @@ Portunus should expose thin tools mapping 1:1 (names indicative):
 - `narthex_status`, `narthex_config_get`, `narthex_config_patch`
 - `narthex_scene_set`, `narthex_scene_push`
 - `narthex_widget_upsert`, `narthex_widget_move`, `narthex_widget_remove`
-- `narthex_display`, `narthex_ota_check`, `narthex_ota_apply`, `narthex_notify`
+- `narthex_display`, `narthex_ota_check`, `narthex_ota_apply`, `narthex_ota_rollback`, `narthex_notify`
 
 Implementation options later: Hermes plugin, skill+httpx, or MCP wrapper. **Contract lives here** regardless of wrapper.
 

@@ -1,8 +1,14 @@
-/* Narthex stage renderer — absolute widgets from /api/state */
+/* Narthex stage renderer — absolute widgets + WS */
 (function () {
   const stageEl = document.getElementById("stage");
   let style = {};
   let stage = { width: 1000, height: 1000 };
+  let clockTimers = [];
+
+  function clearClocks() {
+    clockTimers.forEach(clearInterval);
+    clockTimers = [];
+  }
 
   function scaleBox(w) {
     const sw = stageEl.clientWidth;
@@ -36,6 +42,7 @@
   }
 
   function renderScene(scene) {
+    clearClocks();
     stageEl.innerHTML = "";
     const widgets = (scene.widgets || []).slice().sort((a, b) => (a.z || 0) - (b.z || 0));
     for (const w of widgets) {
@@ -53,7 +60,7 @@
       });
       if (w.type === "clock") {
         renderClock(el);
-        setInterval(() => renderClock(el), 1000);
+        clockTimers.push(setInterval(() => renderClock(el), 1000));
       } else if (w.type === "text") {
         if ((w.props || {}).role === "date") renderDate(el);
         else el.textContent = (w.props || {}).content || "";
@@ -74,23 +81,49 @@
     }
   }
 
+  function applyState(data) {
+    if (data.style) {
+      style = data.style;
+      if (style.void) {
+        document.body.style.background = style.void;
+        stageEl.style.background = style.void;
+      }
+    }
+    if (data.stage) stage = data.stage;
+    if (data.scene) renderScene(data.scene);
+  }
+
   async function refresh() {
     try {
       const r = await fetch("/api/state");
-      const data = await r.json();
-      style = data.style || style;
-      stage = data.stage || stage;
-      if (data.style && data.style.void) {
-        document.body.style.background = data.style.void;
-        stageEl.style.background = data.style.void;
-      }
-      if (data.scene) renderScene(data.scene);
+      applyState(await r.json());
     } catch (e) {
       console.error(e);
     }
   }
 
+  function connectWs() {
+    const proto = location.protocol === "https:" ? "wss" : "ws";
+    const ws = new WebSocket(`${proto}://${location.host}/ws`);
+    ws.onmessage = (ev) => {
+      try {
+        const msg = JSON.parse(ev.data);
+        if (msg.topic === "hello" || msg.topic === "scene" || msg.scene) applyState(msg);
+      } catch (e) {
+        console.error(e);
+      }
+    };
+    ws.onclose = () => setTimeout(connectWs, 2000);
+    ws.onopen = () => {
+      /* keep-alive pings */
+      setInterval(() => {
+        if (ws.readyState === 1) ws.send("ping");
+      }, 25000);
+    };
+  }
+
   window.addEventListener("resize", refresh);
   refresh();
-  setInterval(refresh, 5000);
+  connectWs();
+  setInterval(refresh, 15000);
 })();

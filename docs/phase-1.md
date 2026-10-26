@@ -1,25 +1,33 @@
-# Phase 1 — vertical slice
+# Phase 1 — vertical slice (status)
 
-After skeleton (Phase 0):
+## Done in v0.2.0
 
-## Goals
+- [x] Installable package + CI
+- [x] `narthex version` / `narthexd --dry-run`
+- [x] Device API status/config/scene/widgets/display
+- [x] Dual-bind daemon (UI `:7840` + API `:7841`)
+- [x] WebSocket `/ws` + stage client
+- [x] **Signed OTA** check/apply/rollback (Ed25519) + CLI pack/keygen
+- [x] Audio pipeline design + state machine (AMI lessons) with null backends
+- [x] Hermes client `ping-hermes` (optional)
 
-1. Installable package: `pip install -e .`
-2. `narthex version` / `narthexd --dry-run` load config + home scene
-3. Device API: `GET /v1/status`, `GET /v1/scene`, `GET|PATCH /v1/config` with bearer token
-4. Hermes client: optional `narthex ping-hermes` against Portunus API (skip if unreachable)
-5. UI: serve static home stage on `:7840` with WS scene push (even if audio is stub)
+## Remaining toward full doorway
 
-## Non-goals this phase
+- [ ] Real mic runner: openWakeWord + Silero + faster-whisper on device
+- [ ] Piper TTS playback
+- [ ] DPMS/CEC display backends
+- [ ] Production OTA channel URL (GH Releases or Stronghold store)
+- [ ] Portunus profile + tool wrappers
+- [ ] VoxMetrica badge path
 
-- Real openWakeWord / whisper / piper
-- Signed OTA against production channel
-- VoxMetrica
-- Full Portunus tool plugin (document mapping only)
+## Device bootstrap (existing Pi)
 
-## Done when
-
-- [ ] `pytest` green in CI
-- [ ] Dry-run daemon prints loaded scene id `home`
-- [ ] curl status with token returns version `0.1.0`
-- [ ] Browser/kiosk can open UI and see black stage + gold node (static OK)
+```bash
+git clone https://github.com/wilfullyapt/narthex.git
+cd narthex && python3 -m venv .venv && . .venv/bin/activate
+pip install -e ".[dev]"
+# optional: pip install -e ".[audio]"
+cp config.example.yaml /etc/narthex/config.yaml
+# set NARTHEX_DEVICE_TOKEN, NARTHEX_HERMES_API_KEY, ota.check_url, ota public key
+narthexd -c /etc/narthex/config.yaml
+```

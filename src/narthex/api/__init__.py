@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import asyncio
 from pathlib import Path
+from typing import Any
 
-from fastapi import Depends, FastAPI, Header, HTTPException
+from fastapi import Depends, FastAPI, Header, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
@@ -34,6 +36,7 @@ class DisplayBody(BaseModel):
 
 class OtaApplyBody(BaseModel):
     version: str
+    restart: bool = False
 
 
 class NotifyBody(BaseModel):
@@ -41,20 +44,64 @@ class NotifyBody(BaseModel):
     ttl_s: float | None = 8
 
 
+class WsHub:
+    def __init__(self) -> None:
+        self._clients: set[WebSocket] = set()
+        self._lock = asyncio.Lock()
+
+    async def connect(self, ws: WebSocket) -> None:
+        await ws.accept()
+        async with self._lock:
+            self._clients.add(ws)
+
+    async def disconnect(self, ws: WebSocket) -> None:
+        async with self._lock:
+            self._clients.discard(ws)
+
+    async def broadcast(self, message: dict[str, Any]) -> None:
+        async with self._lock:
+            clients = list(self._clients)
+        dead: list[WebSocket] = []
+        for ws in clients:
+            try:
+                await ws.send_json(message)
+            except Exception:  # noqa: BLE001
+                dead.append(ws)
+        for ws in dead:
+            await self.disconnect(ws)
+
+
 def create_app(runtime: Runtime) -> FastAPI:
     app = FastAPI(title="Narthex", version=__version__)
     display = Display(runtime.cfg.display.backend)
+    data_dir = Path(runtime.cfg.data_dir)
     ota = OtaManager(
+        data_dir,
         require_signature=runtime.cfg.ota.require_signature,
         channel=runtime.cfg.ota.channel,
+        check_url=runtime.cfg.ota.check_url,
+        keep_versions=runtime.cfg.ota.keep_versions,
+        current_version=__version__,
     )
     runtime.display_state = display.state
     runtime.ota_job = ota.job
+    runtime.ota = ota  # type: ignore[attr-defined]
+    hub = WsHub()
+
+    def _fanout(payload: dict[str, Any]) -> None:
+        topic = str(payload.get("topic", "event"))
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                asyncio.run_coroutine_threadsafe(hub.broadcast({"topic": topic, **payload}), loop)
+        except RuntimeError:
+            pass
+
+    runtime.bus.subscribe("*", _fanout)
 
     def require_token(authorization: str | None = Header(default=None)) -> None:
         expected = runtime.cfg.server.device_token
         if not expected:
-            # Dev mode: allow if no token configured
             return
         if not authorization or not authorization.startswith("Bearer "):
             raise HTTPException(status_code=401, detail="missing bearer token")
@@ -62,14 +109,13 @@ def create_app(runtime: Runtime) -> FastAPI:
         if got != expected:
             raise HTTPException(status_code=403, detail="invalid token")
 
-    # --- Device API ---
     api = FastAPI()
 
     @api.get("/v1/status")
     def status(_: None = Depends(require_token)):
         st = runtime.status()
         st["display"] = display.state
-        st["ota"] = ota.job
+        st["ota"] = ota.status()
         return st
 
     @api.get("/v1/config")
@@ -82,6 +128,10 @@ def create_app(runtime: Runtime) -> FastAPI:
             runtime.store.patch(body.patch)
         except PermissionError as e:
             raise HTTPException(status_code=403, detail=str(e)) from e
+        if "ota" in body.patch:
+            ota.check_url = runtime.cfg.ota.check_url
+            ota.require_signature = runtime.cfg.ota.require_signature
+            ota.channel = runtime.cfg.ota.channel
         return {"ok": True, "config": runtime.store.as_public_dict()}
 
     @api.get("/v1/scene")
@@ -121,9 +171,10 @@ def create_app(runtime: Runtime) -> FastAPI:
     @api.patch("/v1/widgets/{widget_id}")
     def widget_patch(widget_id: str, body: dict, _: None = Depends(require_token)):
         try:
-            w = runtime.scene.move_widget(widget_id, **{k: body[k] for k in body if k in (
-                "x", "y", "w", "h", "z", "props", "effect"
-            )})
+            w = runtime.scene.move_widget(
+                widget_id,
+                **{k: body[k] for k in body if k in ("x", "y", "w", "h", "z", "props", "effect")},
+            )
         except KeyError:
             raise HTTPException(status_code=404, detail="widget not found") from None
         runtime.bus.publish("scene", {"scene": runtime.scene.model_dump()})
@@ -153,11 +204,15 @@ def create_app(runtime: Runtime) -> FastAPI:
 
     @api.post("/v1/ota/apply")
     def ota_apply(body: OtaApplyBody, _: None = Depends(require_token)):
-        return ota.apply(body.version)
+        return ota.apply(body.version, restart=body.restart)
 
     @api.get("/v1/ota/status")
     def ota_status(_: None = Depends(require_token)):
         return ota.status()
+
+    @api.post("/v1/ota/rollback")
+    def ota_rollback(_: None = Depends(require_token)):
+        return ota.rollback()
 
     @api.post("/v1/notify")
     def notify(body: NotifyBody, _: None = Depends(require_token)):
@@ -166,9 +221,9 @@ def create_app(runtime: Runtime) -> FastAPI:
 
     app.mount("/device", api)
 
-    # --- Local UI ---
     web_root = Path(__file__).resolve().parents[3] / "web"
     if (web_root / "index.html").exists():
+
         @app.get("/")
         def index():
             return FileResponse(web_root / "index.html")
@@ -184,6 +239,25 @@ def create_app(runtime: Runtime) -> FastAPI:
             "stage": runtime.cfg.scene.stage.model_dump(),
             "scene": runtime.scene.model_dump(),
             "display": display.state,
+            "audio": runtime.audio_state,
         }
+
+    @app.websocket("/ws")
+    async def ws_endpoint(ws: WebSocket):
+        await hub.connect(ws)
+        await ws.send_json(
+            {
+                "topic": "hello",
+                "version": __version__,
+                "scene": runtime.scene.model_dump(),
+                "style": runtime.cfg.style.model_dump(),
+                "stage": runtime.cfg.scene.stage.model_dump(),
+            }
+        )
+        try:
+            while True:
+                await ws.receive_text()
+        except WebSocketDisconnect:
+            await hub.disconnect(ws)
 
     return app
