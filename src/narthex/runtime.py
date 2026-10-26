@@ -25,7 +25,7 @@ class Runtime:
         return self.store.cfg
 
     def status(self) -> dict[str, Any]:
-        return {
+        out = {
             "ok": True,
             "version": __version__,
             "node": self.cfg.node.model_dump(),
@@ -38,6 +38,14 @@ class Runtime:
             },
             "ota": self.ota_job,
         }
+        doorway = getattr(self, "doorway", None)
+        if doorway is not None and getattr(doorway, "last_turn", None):
+            out["last_turn"] = {
+                "ok": doorway.last_turn.get("ok"),
+                "user_text": doorway.last_turn.get("user_text"),
+                "assistant_text": doorway.last_turn.get("assistant_text"),
+            }
+        return out
 
     def set_scene(self, scene: Scene) -> Scene:
         self.scene = scene

@@ -19,6 +19,7 @@
 - [docs/scenes.md](./docs/scenes.md) — widget + scene model
 - [docs/ota.md](./docs/ota.md) — signed OTA
 - [docs/audio.md](./docs/audio.md) — wake/STT design (AMI lessons)
+- [docs/hub-client.md](./docs/hub-client.md) — Portunus → device HTTP helper
 - [docs/phase-1.md](./docs/phase-1.md) — vertical slice status
 
 ## Quick start (dev smoke)
@@ -30,9 +31,7 @@ pip install -e ".[dev]"
 pytest
 narthex version
 narthexd --config config.example.yaml --dry-run
-
-# OTA keygen + local pack/apply demo
-narthex ota keygen --out-dir /tmp/narthex-keys
+narthex say "hello Portunus" --mock
 ```
 
 Kiosk + real audio require a Pi (or Linux box with mic) — see DESIGN / docs/audio.md.

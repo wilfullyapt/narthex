@@ -38,11 +38,11 @@ audio:
     model_size: base
     device: cpu
   tts:
-    engine: piper
+    engine: "null"  # "null" | piper — use null until speakers wired
     voice: en_US-lessac-medium
 
 display:
-  backend: dpms  # dpms | cec | noop
+  backend: noop  # noop | dpms | cec | auto
   idle_sleep_s: 1800
   force_on_wake: true
 

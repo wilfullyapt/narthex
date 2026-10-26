@@ -11,8 +11,11 @@ from pydantic import BaseModel, Field
 
 from narthex import __version__
 from narthex.display import Display
+from narthex.doorway import Doorway
 from narthex.ota import OtaManager
+from narthex.runner import SimulateRunner
 from narthex.runtime import Runtime
+from narthex.tts import build_tts
 from narthex.widgets import Widget
 
 
@@ -42,6 +45,11 @@ class OtaApplyBody(BaseModel):
 class NotifyBody(BaseModel):
     text: str
     ttl_s: float | None = 8
+
+
+class TurnBody(BaseModel):
+    text: str
+    speak: bool = False
 
 
 class WsHub:
@@ -84,8 +92,14 @@ def create_app(runtime: Runtime) -> FastAPI:
         current_version=__version__,
     )
     runtime.display_state = display.state
+    runtime.display = display  # type: ignore[attr-defined]
     runtime.ota_job = ota.job
     runtime.ota = ota  # type: ignore[attr-defined]
+    tts = build_tts(runtime.cfg.audio.tts.engine, runtime.cfg.audio.tts.voice)
+    doorway = Doorway(runtime, tts=tts)
+    runtime.doorway = doorway  # type: ignore[attr-defined]
+    sim = SimulateRunner(doorway)
+    runtime.sim = sim  # type: ignore[attr-defined]
     hub = WsHub()
 
     def _fanout(payload: dict[str, Any]) -> None:
@@ -213,6 +227,14 @@ def create_app(runtime: Runtime) -> FastAPI:
     @api.post("/v1/ota/rollback")
     def ota_rollback(_: None = Depends(require_token)):
         return ota.rollback()
+
+    @api.post("/v1/wake")
+    def wake(_: None = Depends(require_token)):
+        return sim.wake()
+
+    @api.post("/v1/turn")
+    def turn(body: TurnBody, _: None = Depends(require_token)):
+        return sim.utter(body.text, speak=body.speak)
 
     @api.post("/v1/notify")
     def notify(body: NotifyBody, _: None = Depends(require_token)):

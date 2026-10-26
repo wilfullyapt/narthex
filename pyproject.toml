@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "narthex"
-version = "0.2.0"
+version = "0.3.0"
 description = "LAN voice doorway appliance: Magic Mirror–class glass + wake word to Hermes (Portunus)"
 readme = "README.md"
 license = "MIT"

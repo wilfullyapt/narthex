@@ -94,6 +94,7 @@ See [docs/audio.md](./docs/audio.md). AMI vad_quest listener lessons applied; lo
 |-------|---------|
 | **0** | Skeleton + CI + public repo |
 | **1 / 0.2** | Dual bind, WS, **working signed OTA**, audio state machine |
+| **1.5 / 0.3** | Doorway turn loop, simulate say/turn, display backends, hub_client |
 | **2** | Device mic: OWW + VAD + faster-whisper + Piper |
 | **3** | DPMS/CEC + cold-listen policy on glass |
 | **4** | Portunus tools + production channel |

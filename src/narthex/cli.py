@@ -7,10 +7,13 @@ from pathlib import Path
 
 from narthex import __version__
 from narthex.config import load_config
+from narthex.doorway import Doorway
 from narthex.hermes import HermesClient
 from narthex.ota import OtaManager, keygen, sha256_file, sign_entry
+from narthex.runner import SimulateRunner
 from narthex.runtime import Runtime
 from narthex.scenes import get_scene
+from narthex.tts import build_tts
 
 
 def cmd_version(_: argparse.Namespace) -> int:
@@ -38,6 +41,41 @@ def cmd_status(args: argparse.Namespace) -> int:
     rt = Runtime(store)
     print(json.dumps(rt.status(), indent=2))
     return 0
+
+
+def cmd_say(args: argparse.Namespace) -> int:
+    """Simulate a full doorway turn (wake + user text → Portunus → glass)."""
+    store = load_config(args.config)
+    rt = Runtime(store)
+    tts = build_tts("null" if not args.speak else store.cfg.audio.tts.engine, store.cfg.audio.tts.voice)
+    hermes = HermesClient(store.cfg.hermes, session_id=store.cfg.node.id)
+    if args.mock:
+        hermes = _MockHermes()
+    doorway = Doorway(rt, hermes=hermes, tts=tts)
+    sim = SimulateRunner(doorway)
+    result = sim.utter(args.text, speak=bool(args.speak))
+    print(json.dumps(result, indent=2, default=str))
+    return 0 if result.get("ok") else 1
+
+
+def cmd_wake(args: argparse.Namespace) -> int:
+    store = load_config(args.config)
+    rt = Runtime(store)
+    doorway = Doorway(rt, tts=build_tts("null"))
+    print(json.dumps(SimulateRunner(doorway).wake(), indent=2))
+    return 0
+
+
+class _MockHermes:
+    def chat(self, user_text: str, *, system: str | None = None) -> dict:
+        return {
+            "choices": [
+                {"message": {"role": "assistant", "content": f"Mock Portunus heard: {user_text}"}}
+            ]
+        }
+
+    def ping(self) -> dict:
+        return {"ok": True, "data": self.chat("ping")}
 
 
 def _ota_mgr(args: argparse.Namespace) -> OtaManager:
@@ -143,6 +181,15 @@ def main(argv: list[str] | None = None) -> None:
 
     p_ping = sub.add_parser("ping-hermes", help="Ping Portunus API server")
     p_ping.set_defaults(func=cmd_ping_hermes)
+
+    p_say = sub.add_parser("say", help="Simulate doorway turn (text in → Portunus → glass)")
+    p_say.add_argument("text", help="User utterance transcript")
+    p_say.add_argument("--speak", action="store_true", help="Run TTS backend")
+    p_say.add_argument("--mock", action="store_true", help="Mock Portunus (no hub required)")
+    p_say.set_defaults(func=cmd_say)
+
+    p_wake = sub.add_parser("wake", help="Simulate wake chrome only")
+    p_wake.set_defaults(func=cmd_wake)
 
     p_ota = sub.add_parser("ota", help="OTA operations")
     ota_sub = p_ota.add_subparsers(dest="ota_cmd", required=True)

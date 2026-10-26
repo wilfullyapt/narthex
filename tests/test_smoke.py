@@ -13,7 +13,7 @@ from narthex.scenes import home_scene
 
 
 def test_version():
-    assert __version__ == "0.2.0"
+    assert __version__ == "0.3.0"
 
 
 def test_home_scene_has_gold_node():
@@ -76,7 +76,7 @@ def test_api_status():
     r = client.get("/device/v1/status", headers={"Authorization": "Bearer test-token"})
     assert r.status_code == 200
     body = r.json()
-    assert body["version"] == "0.2.0"
+    assert body["version"] == "0.3.0"
     assert body["scene_id"] == "home"
     assert "ota" in body
 
@@ -248,3 +248,76 @@ def test_ota_api_apply(tmp_path: Path):
     body = r.json()
     assert body["ok"] is True
     assert body["version"] == "9.9.9"
+
+
+def test_doorway_mock_turn():
+    from narthex.doorway import Doorway
+    from narthex.runner import SimulateRunner
+    from narthex.tts import NullTts
+
+    class MockHermes:
+        def chat(self, user_text, *, system=None):
+            return {"choices": [{"message": {"content": f"echo:{user_text}"}}]}
+
+    store = ConfigStore(raw={"data_dir": "/tmp/narthex-doorway"})
+    rt = Runtime(store)
+    door = Doorway(rt, hermes=MockHermes(), tts=NullTts())
+    sim = SimulateRunner(door)
+    result = sim.utter("what time is it", speak=False)
+    assert result["ok"] is True
+    assert result["assistant_text"] == "echo:what time is it"
+    vs = next(w for w in rt.scene.widgets if w.id == "voice_stage")
+    assert vs.props.get("user_text") == "what time is it"
+    assert "echo:" in (vs.props.get("assistant_text") or "")
+
+
+def test_display_noop_and_auto():
+    from narthex.display import Display
+
+    d = Display("noop")
+    r = d.set_state("off")
+    assert r["state"] == "off"
+    assert r["hw"]["backend"] == "noop"
+    d2 = Display("auto")
+    r2 = d2.set_state("on")
+    assert r2["state"] == "on"
+
+
+def test_hub_client_paths():
+    from narthex.hub_client import NarthexClient
+
+    c = NarthexClient("http://127.0.0.1:7841", token="x")
+    assert c._url("/v1/status").endswith("/device/v1/status")
+    c2 = NarthexClient("http://127.0.0.1:7841/device", token="x")
+    assert c2._url("/v1/status").endswith("/device/v1/status")
+
+
+def test_api_turn_mock(tmp_path, monkeypatch):
+    from fastapi.testclient import TestClient
+
+    from narthex.api import create_app
+    class MockHermes:
+        def chat(self, user_text, *, system=None):
+            return {"choices": [{"message": {"content": "pong-turn"}}]}
+
+    store = ConfigStore(
+        raw={
+            "server": {"device_token": "tok"},
+            "data_dir": str(tmp_path / "d"),
+            "audio": {"tts": {"engine": "null"}},
+        }
+    )
+    rt = Runtime(store)
+    app = create_app(rt)
+    # replace doorway hermes with mock
+    rt.doorway.hermes = MockHermes()  # type: ignore[attr-defined]
+    rt.sim.doorway.hermes = MockHermes()  # type: ignore[attr-defined]
+    client = TestClient(app)
+    h = {"Authorization": "Bearer tok"}
+    r = client.post("/device/v1/wake", headers=h)
+    assert r.status_code == 200 and r.json()["ok"] is True
+    r = client.post("/device/v1/turn", headers=h, json={"text": "hello mirror", "speak": False})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["ok"] is True
+    assert body["assistant_text"] == "pong-turn"

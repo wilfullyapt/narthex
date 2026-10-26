@@ -8,7 +8,9 @@ import uvicorn
 from narthex.api import create_app
 from narthex.audio import build_pipeline
 from narthex.config import load_config
+from narthex.doorway import Doorway
 from narthex.runtime import Runtime
+from narthex.tts import build_tts
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -24,6 +26,8 @@ def main(argv: list[str] | None = None) -> None:
     runtime.audio = build_pipeline(runtime.bus)  # type: ignore[attr-defined]
     runtime.audio.arm()
     runtime.audio_state = runtime.audio.state.name.lower()
+    tts = build_tts(store.cfg.audio.tts.engine, store.cfg.audio.tts.voice)
+    runtime.doorway = Doorway(runtime, tts=tts)  # type: ignore[attr-defined]
 
     if args.dry_run:
         print(
@@ -31,7 +35,8 @@ def main(argv: list[str] | None = None) -> None:
             f"widgets={len(runtime.scene.widgets)} "
             f"wake={store.cfg.wake.phrase!r} "
             f"cold_listen={store.cfg.wake.cold_listen_when_asleep} "
-            f"audio={runtime.audio_state}"
+            f"audio={runtime.audio_state} "
+            f"tts={store.cfg.audio.tts.engine}"
         )
         return
 
