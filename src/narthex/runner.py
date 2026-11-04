@@ -247,8 +247,16 @@ class LiveMicRunner:
         text = (utt.text or "").strip()
         if self.on_text:
             self.on_text(text)
+        pcm = None
+        try:
+            if chunks:
+                import numpy as np
+
+                pcm = np.concatenate([np.asarray(c).reshape(-1) for c in chunks]).astype(np.int16)
+        except Exception:  # noqa: BLE001
+            pcm = None
         if text:
-            self.doorway.handle_user_text(text, speak=self.speak)
+            self.doorway.handle_user_text(text, speak=self.speak, pcm=pcm, sample_rate=self.sample_rate)
         else:
             self.doorway.set_voice_stage(
                 state="error",

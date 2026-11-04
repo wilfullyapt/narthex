@@ -13,7 +13,7 @@ from narthex.scenes import home_scene
 
 
 def test_version():
-    assert __version__ == "0.4.0"
+    assert __version__ == "0.4.1"
 
 
 def test_home_scene_has_gold_node():
@@ -76,7 +76,7 @@ def test_api_status():
     r = client.get("/device/v1/status", headers={"Authorization": "Bearer test-token"})
     assert r.status_code == 200
     body = r.json()
-    assert body["version"] == "0.4.0"
+    assert body["version"] == __version__
     assert body["scene_id"] == "home"
     assert "ota" in body
 
