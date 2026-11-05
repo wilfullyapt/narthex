@@ -6,6 +6,7 @@ from __future__ import annotations
 from typing import Any
 
 from narthex.hermes import HermesClient
+from narthex.identity import IdentityClient, build_identity
 from narthex.runtime import Runtime
 from narthex.tts import NullTts, TtsBackend
 from narthex.widgets import Widget
@@ -45,12 +46,15 @@ class Doorway:
         hermes: HermesClient | None = None,
         tts: TtsBackend | None = None,
         system_prompt: str = DEFAULT_SYSTEM,
+        identity: IdentityClient | None = None,
     ):
         self.runtime = runtime
         self.hermes = hermes or HermesClient(runtime.cfg.hermes, session_id=runtime.cfg.node.id)
         self.tts = tts or NullTts()
         self.system_prompt = system_prompt
+        self.identity = identity if identity is not None else build_identity(runtime.cfg)
         self.last_turn: dict[str, Any] = {}
+        self.last_claim: dict[str, Any] | None = None
 
     def set_voice_stage(
         self,
@@ -107,7 +111,15 @@ class Doorway:
             self.runtime.display_state = "on"
         self.runtime.bus.publish("display", {"state": "on", "reason": "wake_or_turn"})
 
-    def handle_user_text(self, text: str, *, speak: bool = True) -> dict[str, Any]:
+    def handle_user_text(
+        self,
+        text: str,
+        *,
+        speak: bool = True,
+        claim: dict[str, Any] | None = None,
+        pcm: Any = None,
+        sample_rate: int = 16000,
+    ) -> dict[str, Any]:
         text = (text or "").strip()
         self.force_display_on()
         if not text:
@@ -116,11 +128,40 @@ class Doorway:
             self.last_turn = result
             return result
 
+        # Optional speaker claim (file already identified, or PCM)
+        if claim is None and pcm is not None and self.identity.available:
+            try:
+                claim = self.identity.identify_pcm_int16(pcm, sample_rate=sample_rate)
+            except Exception as e:  # noqa: BLE001
+                claim = {"ok": False, "error": str(e), "outcome": "unknown"}
+        if claim:
+            self.last_claim = claim
+            self.runtime.bus.publish(
+                "identity",
+                {
+                    "outcome": claim.get("outcome"),
+                    "speaker_id": claim.get("speaker_id"),
+                    "display_name": claim.get("display_name"),
+                    "confidence": claim.get("confidence"),
+                },
+            )
+            badge = self.identity.badge(claim)
+            if badge and claim.get("outcome") in ("unknown", "clarify"):
+                # surface badge on glass before brain for enroll/clarify UX
+                self.set_voice_stage(state="brain", user_text=text, assistant_text=badge, visible=True)
+
         self.set_voice_stage(state="brain", user_text=text, assistant_text="", visible=True)
         self.runtime.bus.publish("turn", {"phase": "brain", "user_text": text})
 
+        system = self.system_prompt
+        if claim and claim.get("outcome") == "matched":
+            system = (
+                f"{self.system_prompt} Speaker claim: {claim.get('display_name')} "
+                f"({claim.get('speaker_id')}, conf={claim.get('confidence')})."
+            )
+
         try:
-            raw = self.hermes.chat(text, system=self.system_prompt)
+            raw = self.hermes.chat(text, system=system)
             assistant = _extract_assistant_text(raw) or "(no reply)"
             hermes_ok = True
             hermes_err = None
@@ -142,9 +183,14 @@ class Doorway:
             "assistant_text": assistant,
             "hermes": raw if hermes_ok else {"error": hermes_err},
             "tts": tts_result,
+            "claim": claim,
+            "badge": self.identity.badge(claim) if claim else "",
         }
         self.last_turn = result
-        self.runtime.bus.publish("turn", {"phase": "done", **{k: result[k] for k in ("user_text", "assistant_text", "ok")}})
+        self.runtime.bus.publish(
+            "turn",
+            {"phase": "done", **{k: result[k] for k in ("user_text", "assistant_text", "ok")}},
+        )
         return result
 
     def handle_wake(self) -> dict[str, Any]:

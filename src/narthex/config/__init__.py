@@ -85,6 +85,8 @@ class StyleConfig(BaseModel):
 class IdentityConfig(BaseModel):
     enabled: bool = False
     voxmetrica_root: str | None = None
+    ingress: str = "narthex"
+    session_id: str | None = None  # default: node.id
 
 
 class OtaConfig(BaseModel):

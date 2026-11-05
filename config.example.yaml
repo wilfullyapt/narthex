@@ -67,9 +67,12 @@ style:
   mist: "#A8A29A"
 
 identity:
-  # Optional local VoxMetrica client; hub remains authoritative for caps
+  # Optional local VoxMetrica EdgeClient (pip install -e '.[identity]' + voxmetrica)
+  # Hub Portunus plugin remains authoritative for capability enforcement.
   enabled: false
-  voxmetrica_root: null
+  voxmetrica_root: null   # or $VOXMETRICA_ROOT / path shared with hub
+  ingress: narthex
+  session_id: null        # default: node.id
 
 ota:
   enabled: true
